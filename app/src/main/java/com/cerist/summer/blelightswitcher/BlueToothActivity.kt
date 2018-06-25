@@ -26,7 +26,6 @@ class BlueToothActivity : AppCompatActivity() {
         (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager).adapter
     }
 
-    private lateinit var mBlueToothLeScanner:BluetoothLeScanner
     var mBluetoothGatt:BluetoothGatt ?= null
     val mHandler:Handler = Handler()
     lateinit var  mLampSwitcher: Switch
@@ -80,10 +79,8 @@ class BlueToothActivity : AppCompatActivity() {
                 scanSettings,
                 mBleScanCallbacks
         )
-        lamp_state_switcher.setOnCheckedChangeListener({ compoundButton: CompoundButton, state: Boolean ->
-            Log.d(TAG, "changing the lamp state")
-            setLampState(state)
-        })
+
+
 
     }
     private fun stopBleScan(){
@@ -94,6 +91,12 @@ class BlueToothActivity : AppCompatActivity() {
         val bluetoothDevice = scanResult.device
         Log.d(TAG, "device name ${bluetoothDevice.name} with address ${bluetoothDevice.address}")
         stopBleScan()
+
+        lamp_state_switcher.setOnCheckedChangeListener({ _: CompoundButton, state: Boolean ->
+            Log.d(TAG, "changing the lamp state")
+            setLampState(state)
+        })
+
         mBluetoothGatt = bluetoothDevice.connectGatt(BlueToothActivity@this,false,mBleGattCallBack)
 
 
@@ -101,7 +104,7 @@ class BlueToothActivity : AppCompatActivity() {
     }
 
 
-    val mBleScanCallbacks: ScanCallback by lazy {
+    private val mBleScanCallbacks: ScanCallback by lazy {
         object : ScanCallback(){
             override fun onScanFailed(errorCode: Int) {
                 Log.d(TAG,"on Scan Failed")
@@ -113,7 +116,7 @@ class BlueToothActivity : AppCompatActivity() {
             }
 
             override fun onBatchScanResults(results: MutableList<ScanResult>?) {
-                Log.d("SCAN","on batch scan results")
+                Log.d(TAG,"on batch scan results")
                 results?.forEach {
                     processScanResult(it)
                 }
@@ -121,7 +124,7 @@ class BlueToothActivity : AppCompatActivity() {
         }
     }
 
-    val mBleGattCallBack: BluetoothGattCallback by lazy {
+    private val mBleGattCallBack: BluetoothGattCallback by lazy {
         object : BluetoothGattCallback(){
 
             override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
@@ -144,31 +147,34 @@ class BlueToothActivity : AppCompatActivity() {
 
                 gatt?.readCharacteristic(characteristic)
 
-
-
-
             }
 
             override fun onCharacteristicRead(gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int) {
                 super.onCharacteristicRead(gatt, characteristic, status)
-                Log.d("TAG","reading into the characteristic ${characteristic?.uuid} the value ${characteristic?.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32,0)}")
+                Log.d(TAG,"onCharacteristicRead: reading into the characteristic ${characteristic?.uuid} the value ${characteristic?.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32,0)}")
 
                 if(DeviceProfile.CHARACTERISTIC_STATE_UUID == characteristic?.uuid){
-                    val value = characteristic?.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32,0)
-                   mHandler.post {
-                       mLampSwitcher.isChecked = value==1
-                   }
+
                     gatt?.setCharacteristicNotification(characteristic,true)
+
+                    val value :Int= characteristic?.value!![0].toInt()
+                    mHandler.post {
+                        Log.d(TAG,"Value: ${value}")
+                        mLampSwitcher.setChecked(value==1)
+                    }
+
                 }
 
             }
 
             override fun onCharacteristicChanged(gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?) {
                 super.onCharacteristicChanged(gatt, characteristic)
-                Log.d("TAG","reading into the characteristic ${characteristic?.uuid} the value ${characteristic?.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32,0)}")
-                val value = characteristic?.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32,0)
+                Log.d(TAG,"onCharacteristicChanged: reading into the characteristic ${characteristic?.uuid} the value ${characteristic?.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT32,0)}")
+
+                val value :Int?= characteristic?.value!![0].toInt()
                 mHandler.post {
-                    mLampSwitcher.isChecked = value==1
+                        Log.d(TAG,"onCharacteristicChanged: Value ${value}")
+                        mLampSwitcher.setChecked(value==1)
                 }
             }
         }
